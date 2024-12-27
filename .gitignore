@@ -1,0 +1,6 @@
+*.o
+*.so
+remap
+test/*.o
+test/test
+test/test2

@@ -1,0 +1,51 @@
+map types:
+
+R = remap
+S = special
+
+REMAP MAPS
+===============================================================================
+
+bind types:
+
+  = next ASCII character in map string
+L = left arrow
+D = down arrow
+U = up arrow
+R = right arrow
+X = del
+I = insert
+H = home
+E = end
+P = page up
+V = page down
+
+each remap map takes 5 characters and is in the map string:
+
+<map type> <bind type> <bind> <bindto type> <bindto>
+
+for example, to remap shift+w to s:
+
+R W s|
+
+vi movement keys for a program that uses arrow keys:
+
+R hl R jd R ku R lr |
+
+SPECIAL MAPS
+===============================================================================
+
+each special map takes 5 characters and is in the map string:
+
+special map types:
+
+T = toggle functionality
+D = disable
+E = enable
+Q = force quit
+
+<map type> <special map type> <bind type> <bind> <empty>
+
+for example, to force quit on shift+q:
+
+SQ Q |
