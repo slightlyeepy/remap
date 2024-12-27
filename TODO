@@ -1,0 +1,5 @@
+highest to lowest priority:
+
+- come up with a config file format, make the program parse a config file and turn it into a map string
+- don't use gcc/glibc extensions
+- clean up codebase

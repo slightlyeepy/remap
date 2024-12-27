@@ -25,26 +25,24 @@
  * For more information, please refer to <http://unlicense.org/>
  */
 
-#include <ctype.h>
-#include <stdio.h>
-#include <unistd.h>
+#ifndef PORTABLE_MACROS_H
+#define PORTABLE_MACROS_H
 
-int
-main(void)
-{
-	char buf[16];
-	ssize_t nread;
+/* NORETURN */
+#ifdef __GNUC__
+#define NORETURN __attribute__((__noreturn__))
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define NORETURN _Noreturn
+#else
+#define NORETURN
+#endif
 
-	for (int i = 0; i < 15; ++i) {
-		nread = read(STDIN_FILENO, buf, sizeof(buf));
-		for (ssize_t j = 0; j < nread; ++j) {
-			if (isprint(buf[j]))
-				putchar(buf[j]);
-			else
-				printf("(%#x)", buf[j]);
-		}
-		putchar('\n');
-	}
+/* UNREACHABLE() */
+#ifdef __GNUC__
+#define UNREACHABLE() __builtin_unreachable()
+#else
+#include <stdlib.h>
+#define UNREACHABLE() abort()
+#endif
 
-	return 0;
-}
+#endif /* PORTABLE_MACROS_H */

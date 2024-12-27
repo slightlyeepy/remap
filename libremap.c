@@ -1,4 +1,31 @@
 /*
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * For more information, please refer to <http://unlicense.org/>
+ */
+
+/*
  * ============================================================================
  * includes
  */
@@ -18,6 +45,19 @@
 
 /*
  * ============================================================================
+ * library includes
+ */
+#define DYNBUF_IMPLEMENTATION
+#define DYNBUF_OOM() { \
+	fputs("\033[31mlibremap: error: out of memory\033[0m\n", stderr); \
+	exit(1); \
+}
+#include "util/dynbuf.h"
+
+#include "util/portable_macros.h"
+
+/*
+ * ============================================================================
  * macros
  */
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -28,7 +68,7 @@
  */
 
 /* errors */
-/* noreturn */ static void die(const char *fmt, ...);
+NORETURN static void die(const char *fmt, ...);
 
 /* atexit() cleanup */
 static void cleanup(void);
@@ -61,14 +101,6 @@ static ssize_t read_and_remap(int fd, /* (modifies) */ void *buf, size_t count);
 
 /*
  * ============================================================================
- * library includes (listed here so that die() is visible)
- */
-#define DYNBUF_IMPLEMENTATION
-#define DYNBUF_OOM() die("libremap: error: out of memory");
-#include "util/dynbuf.h"
-
-/*
- * ============================================================================
  * global variables
  */
 static ssize_t (*libc_read)(int, void *, size_t) = NULL;
@@ -84,7 +116,7 @@ static int enabled = 1;
  * ============================================================================
  * errors
  */
-/* noreturn */
+NORETURN
 static void
 die(const char *fmt, ...)
 {
@@ -156,6 +188,7 @@ parse_special_map_type(char c)
 	case 'Q':
 		return SPECIAL_MAP_TYPE_FORCE_QUIT;
 	}
+	die("libremap: error: invalid special map type");
 }
 
 /* (modifies global state) */
@@ -341,6 +374,7 @@ convert_from_bind(const struct bind *bind, /* (modifies) */ char *buf, size_t bu
 		memcpy(buf, PAGE_DOWN, ret);
 		return ret;
 	}
+	UNREACHABLE();
 }
 
 static size_t
@@ -409,9 +443,6 @@ read_and_remap(int fd, /* (modifies) */ void *buf, size_t count)
 
 	size_t byteswritten;
 	size_t writeidx;
-
-	char tmpbuf[4];
-	int unread;
 
 	if (!readbuf || !newbuf)
 		die("libremap: error: out of memory");
@@ -493,7 +524,7 @@ read(int fd, /* (modifies) */ void *buf, size_t count)
 					unread > 0) {
 				int olderrno = errno;
 				ssize_t nread = read_and_remap(fd, cbuf + npending,
-						MIN(count - npending, unread));
+						MIN(count - npending, (size_t)unread));
 				if (nread < 0) {
 					errno = olderrno;
 					return (ssize_t)npending;
