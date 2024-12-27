@@ -5,12 +5,14 @@ LIBREMAP_SRC     = libremap.c
 LIBREMAP_HEADERS = remap.h util/dynbuf.h
 REMAP_SRC        = remap.c
 
+CFLAGS = -std=c99 -pedantic -Os
+
 PREFIX  = /usr/local
 
 libremap.so: ${LIBREMAP_SRC} ${LIBREMAP_HEADERS}
-	${CC} -fPIC -shared -o libremap.so ${LIBREMAP_SRC}
+	${CC} -fPIC -shared ${CFLAGS} -o libremap.so ${LIBREMAP_SRC}
 remap: ${REMAP_SRC} libremap.so
-	${CC} -L. -lremap -o remap ${REMAP_SRC}
+	${CC} -L. -lremap ${CFLAGS} -o remap ${REMAP_SRC}
 install: libremap.so remap
 	mkdir -p ${DESTDIR}${PREFIX}/lib
 	cp -f libremap.so ${DESTDIR}${PREFIX}/lib

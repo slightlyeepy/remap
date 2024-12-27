@@ -30,10 +30,8 @@ main(void)
 	cfmakeraw(&tio);
 	tcsetattr(STDIN_FILENO, TCSANOW, &tio);
 	write(STDOUT_FILENO, "\033[2J\033[;H", 8);
-	while (read(STDIN_FILENO, &c, 1) > 0) {
+	while (read(STDIN_FILENO, &c, 1) > 0)
 		print_char(c);
-		//write(STDOUT_FILENO, "\r\n", 2);
-	}
 	tcsetattr(STDIN_FILENO, TCSANOW, &oldtio);
 	return 0;
 }

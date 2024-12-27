@@ -7,6 +7,7 @@
 #include <sys/ioctl.h>
 
 #include <dlfcn.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -345,10 +346,7 @@ convert_from_bind(const struct bind *bind, /* (modifies) */ char *buf, size_t bu
 static size_t
 convert_to_bind(const char *s, size_t sl, /* (modifies) */ struct bind *bind)
 {
-	fprintf(stderr, "DEBUG: s[0] = %c, s[0] == '\\033' = %d, s[1] = %c, s[1] == '[' == %d\n",
-			s[0], s[0] == '\033', s[1], s[1] == '[');
-	fprintf(stderr, "DEBUG: s = %.*s, sl = %d\n", sl, s, sl);
-	if (sl >= 2 && s[0] == '\033' && s[1] == '[') {
+	if (sl >= 2 && s[0] == '\033' && (s[1] == '[' || s[1] == 'O')) {
 		if (sl >= 3 && s[3] == '~') {
 			switch (s[2]) {
 			case '3':
@@ -400,43 +398,55 @@ convert_to_bind(const char *s, size_t sl, /* (modifies) */ struct bind *bind)
 static ssize_t
 read_and_remap(int fd, /* (modifies) */ void *buf, size_t count)
 {
-	char *cbuf = (char *)buf;
+	size_t readbufsz = count * 4;
+	char *readbuf = malloc(readbufsz); /* worst-case scenario */
 	char *newbuf = malloc(count);
 
 	ssize_t nread;
 	struct bind bind;
 	size_t bindlen;
-	size_t readidx = 0;
+	size_t readidx;
 
 	size_t byteswritten;
-	size_t writeidx = 0;
+	size_t writeidx;
 
-	if (!newbuf)
+	char tmpbuf[4];
+	int unread;
+
+	if (!readbuf || !newbuf)
 		die("libremap: error: out of memory");
 
-	nread = libc_read(fd, buf, count);
-	if (nread < 0) {
-		free(newbuf);
-		return nread;
-	}
-
-	while (readidx < (size_t)nread) {
-		bindlen = convert_to_bind(cbuf + readidx, count - readidx, &bind);
-
-		fprintf(stderr, "DEBUG: %d\n", (int)bind.type);
-
-		if (enabled && try_remap(&bind, newbuf + writeidx,
-					count - writeidx, &byteswritten)) {
-			writeidx += byteswritten;
-		} else if (!try_special(&bind)) {
-			if (writeidx < count)
-				newbuf[writeidx++] = cbuf[readidx];
-			else
-				dynbuf_append(&pending, &cbuf[readidx], 1);
+	do {
+		readidx = 0;
+		writeidx = 0;
+		nread = libc_read(fd, readbuf, readbufsz);
+		if (nread < 0) {
+			free(readbuf);
+			free(newbuf);
+			return nread;
 		}
-		readidx += bindlen;
-	}
+
+		while (readidx < (size_t)nread) {
+			bindlen = convert_to_bind(readbuf + readidx,
+					readbufsz - readidx, &bind);
+
+			if (enabled && try_remap(&bind, newbuf + writeidx,
+						count - writeidx, &byteswritten)) {
+				writeidx += byteswritten;
+				readidx += bindlen;
+			} else if (try_special(&bind)) {
+				readidx += bindlen;
+			} else {
+				if (writeidx < count)
+					newbuf[writeidx++] = readbuf[readidx];
+				else
+					dynbuf_append(&pending, &readbuf[readidx], 1);
+				++readidx;
+			}
+		}
+	} while (writeidx == 0);
 	memcpy(buf, newbuf, writeidx);
+	free(readbuf);
 	free(newbuf);
 	return (ssize_t)writeidx;
 }
@@ -473,7 +483,6 @@ read(int fd, /* (modifies) */ void *buf, size_t count)
 
 			size_t npending = dynbuf_pop_from_start(&pending,
 					cbuf, count);
-			ssize_t nread;
 			int unread;
 
 			/*
@@ -482,10 +491,13 @@ read(int fd, /* (modifies) */ void *buf, size_t count)
 			 */
 			if (npending < count && ioctl(fd, FIONREAD, &unread) == 0 &&
 					unread > 0) {
-				nread = read_and_remap(fd, cbuf + npending,
+				int olderrno = errno;
+				ssize_t nread = read_and_remap(fd, cbuf + npending,
 						MIN(count - npending, unread));
-				if (nread < 0)
+				if (nread < 0) {
+					errno = olderrno;
 					return (ssize_t)npending;
+				}
 				return (ssize_t)npending + nread;
 			}
 			return (ssize_t)npending;
